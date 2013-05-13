@@ -106,7 +106,7 @@ namespace MassTransit.Threading
 						.HandleOnCallingThread();
 				}))
 			{
-				while (completed.WaitOne(60.Seconds(), true))
+				while (completed.WaitOne(_bus.ShutdownTimeout, true))
 				{
 					if (_log.IsDebugEnabled)
 						_log.DebugFormat("Consumer Pool stopped for {0}", _bus.Endpoint.Address.Uri);
@@ -123,7 +123,6 @@ namespace MassTransit.Threading
 		public void Dispose()
 		{
 			Dispose(true);
-			GC.SuppressFinalize(this);
 		}
 
 		void Dispose(bool disposing)
@@ -194,11 +193,6 @@ namespace MassTransit.Threading
 					ReceiverCount = _receiverCount,
 					ConsumerCount = _consumerCount,
 				});
-		}
-
-		~ThreadPoolConsumerPool()
-		{
-			Dispose(false);
 		}
 	}
 }

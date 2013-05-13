@@ -129,6 +129,8 @@ namespace MassTransit
             }
         }
 
+        public TimeSpan ShutdownTimeout { get; set; }
+
         public UntypedChannel EventChannel
         {
             get { return _eventChannel; }
@@ -145,7 +147,6 @@ namespace MassTransit
         public void Dispose()
         {
             Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         public void Publish<T>(T message)

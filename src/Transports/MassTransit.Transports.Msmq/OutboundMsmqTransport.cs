@@ -46,6 +46,7 @@ namespace MassTransit.Transports.Msmq
                     message.Label = context.MessageType.Length > 250 ? context.MessageType.Substring(0, 250) : context.MessageType;
 
                 message.Recoverable = _address.IsRecoverable;
+                message.UseDeadLetterQueue = true; // in case lack of permission message will be redirected to dead letter
 
                 if (context.ExpirationTime.HasValue)
                 {
@@ -81,7 +82,6 @@ namespace MassTransit.Transports.Msmq
         public void Dispose()
         {
             Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         protected virtual void SendMessage(MessageQueue queue, Message message)
@@ -138,11 +138,6 @@ namespace MassTransit.Transports.Msmq
                 default:
                     throw new InvalidConnectionException(_address.Uri, "There was a problem communicating with the message queue", ex);
             }
-        }
-
-        ~OutboundMsmqTransport()
-        {
-            Dispose(false);
         }
     }
 }

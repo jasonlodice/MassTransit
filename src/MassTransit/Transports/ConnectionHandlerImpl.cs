@@ -79,12 +79,17 @@ namespace MassTransit.Transports
         public void Dispose()
         {
             Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         public void Use(Action<T> callback)
         {
-            _policyChain.Execute(() => callback(_connection));
+            _policyChain.Execute(() =>
+                {
+                    if (!_connected)
+                        throw new InvalidConnectionException();
+
+                    callback(_connection);
+                });
         }
 
 
@@ -157,11 +162,6 @@ namespace MassTransit.Transports
             }
 
             _disposed = true;
-        }
-
-        ~ConnectionHandlerImpl()
-        {
-            Dispose(false);
         }
     }
 }
