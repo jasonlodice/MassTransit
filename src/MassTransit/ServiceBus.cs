@@ -69,7 +69,7 @@ namespace MassTransit
         /// and operation.
         /// </summary>
         public ServiceBus(IEndpoint endpointToListenOn,
-            IEndpointCache endpointCache)
+            IEndpointCache endpointCache, bool enablePerformanceCounters)
         {
             ReceiveTimeout = TimeSpan.FromSeconds(3);
             Guard.AgainstNull(endpointToListenOn, "endpointToListenOn", "This parameter cannot be null");
@@ -87,7 +87,8 @@ namespace MassTransit
 
             ControlBus = this;
 
-            InitializePerformanceCounters();
+            if(enablePerformanceCounters)
+                InitializePerformanceCounters();
         }
 
         public int ConcurrentReceiveThreads
@@ -147,7 +148,6 @@ namespace MassTransit
         public void Dispose()
         {
             Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         public void Publish<T>(T message)

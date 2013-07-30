@@ -79,7 +79,6 @@ namespace MassTransit.Transports
         public void Dispose()
         {
             Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         public void Use(Action<T> callback)
@@ -110,9 +109,16 @@ namespace MassTransit.Transports
         {
             lock (_lock)
             {
-                if (_bound)
+                try
                 {
-                    binding.Unbind(_connection);
+                    if (_bound)
+                    {
+                        binding.Unbind(_connection);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.Error("Failed to unbind", ex);
                 }
                 _bindings.Remove(binding);
             }
@@ -154,7 +160,6 @@ namespace MassTransit.Transports
             if (disposing)
             {
                 UnbindBindings();
-
                 Disconnect();
 
                 _connection.Dispose();
@@ -163,11 +168,6 @@ namespace MassTransit.Transports
             }
 
             _disposed = true;
-        }
-
-        ~ConnectionHandlerImpl()
-        {
-            Dispose(false);
         }
     }
 }

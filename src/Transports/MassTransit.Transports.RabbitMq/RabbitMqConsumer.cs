@@ -44,7 +44,7 @@ namespace MassTransit.Transports.RabbitMq
 
                 PurgeIfRequested(channel);
 
-                channel.BasicQos(0, 10, false);
+                channel.BasicQos(0, _address.PrefetchCount, false);
 
                 var consumer = new QueueingBasicConsumer(channel);
                 channel.BasicConsume(_address.Name, false, consumer);
@@ -111,7 +111,7 @@ namespace MassTransit.Transports.RabbitMq
 
         void BindQueue(IModel channel)
         {
-            string queue = channel.QueueDeclare(_address.Name, true, false, false, _address.QueueArguments());
+            string queue = channel.QueueDeclare(_address.Name, _address.Durable, _address.Exclusive, _address.AutoDelete, _address.QueueArguments());
             channel.ExchangeDeclare(_address.Name, ExchangeType.Fanout, true);
             channel.QueueBind(queue, _address.Name, "");
         }

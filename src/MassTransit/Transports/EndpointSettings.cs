@@ -12,7 +12,6 @@
 // specific language governing permissions and limitations under the License.
 namespace MassTransit.Transports
 {
-    using System;
     using Magnum;
     using Serialization;
     using Util;
@@ -21,17 +20,7 @@ namespace MassTransit.Transports
         TransportSettings,
         IEndpointSettings
     {
-        public EndpointSettings([NotNull] string uri)
-            : this(new EndpointAddress(uri))
-        {
-        }
-
-        public EndpointSettings([NotNull] Uri uri)
-            : this(new EndpointAddress(uri))
-        {
-        }
-
-        EndpointSettings(IEndpointAddress address)
+        public EndpointSettings(IEndpointAddress address)
             : base(address)
         {
             ErrorAddress = GetErrorEndpointAddress();
@@ -43,6 +32,7 @@ namespace MassTransit.Transports
             Guard.AgainstNull(source, "source");
 
             Serializer = source.Serializer;
+            SupportedSerializers = source.SupportedSerializers;
             if (source.ErrorAddress != address)
                 ErrorAddress = source.ErrorAddress;
             RetryLimit = source.RetryLimit;
@@ -55,11 +45,17 @@ namespace MassTransit.Transports
             Guard.AgainstNull(source, "source");
 
             Serializer = serializer;
+
+            var messageSerializers = new SupportedMessageSerializers();
+            messageSerializers.AddSerializer(serializer);
+            SupportedSerializers = messageSerializers;
+
             ErrorAddress = GetErrorEndpointAddress();
         }
 
         public IEndpointAddress ErrorAddress { get; set; }
         public IMessageSerializer Serializer { get; set; }
+        public ISupportedMessageSerializers SupportedSerializers { get; set; }
         public int RetryLimit { get; set; }
         public MessageTrackerFactory TrackerFactory { get; set; }
 
