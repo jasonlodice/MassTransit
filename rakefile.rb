@@ -30,7 +30,7 @@ props = {
 }
 
 desc "**Default**, cleans, compiles and runs tests"
-task :default => [:clean, :compile, :ilmerge, :compile_samples, :copy_samples, :copy_services]
+task :default => [:clean, :restore, :compile, :ilmerge, :compile_samples, :copy_samples, :copy_services]
 
 desc "Default + tests"
 task :all => [:default, :tests]
@@ -113,7 +113,7 @@ ilmerge :ilmerge_masstransit do |ilm|
         ilm.use MSB_USE
 	ilm.log = File.join( props[:src], "MassTransit","bin","#{BUILD_CONFIG}", 'ilmerge.log' )
 	ilm.allow_dupes = true
-	ilm.references = [ 'MassTransit.dll', 'Stact.dll', 'Newtonsoft.Json.dll']
+	ilm.references = [ 'MassTransit.dll', 'Stact.dll']
     ilm.keyfile = props[:keyfile]
 end
 
@@ -221,6 +221,13 @@ end
 #	what_commit.puts "The file name denotes what commit these files were built off of. You can also find that information in the assembly info accessible through code."
 #	what_commit.close
 #end
+
+desc "restores missing packages"
+msbuild :restore do |msb|
+  msb.use :net4
+  msb.targets :RestorePackages
+  msb.solution = 'src/MassTransit/MassTransit.csproj'
+end
 
 desc "Only compiles the application."
 msbuild :build do |msb|
@@ -369,6 +376,7 @@ task :all_nuspecs => [:mt_nuspec, :mtl4n_nuspec, :mtnlog_nuspec, :mtsm_nuspec, :
     nuspec.licenseUrl = "http://www.apache.org/licenses/LICENSE-2.0"
     nuspec.requireLicenseAcceptance = "false"
     nuspec.dependency "Magnum", "2.1.0"
+    nuspec.dependency "Newtonsoft.Json", "5.0.6"
     nuspec.output_file = 'nuspecs/MassTransit.nuspec'
 
 	add_files props[:stage], 'MassTransit.{dll,pdb,xml}', nuspec
@@ -434,7 +442,7 @@ task :all_nuspecs => [:mt_nuspec, :mtl4n_nuspec, :mtnlog_nuspec, :mtsm_nuspec, :
     nuspec.licenseUrl = "http://www.apache.org/licenses/LICENSE-2.0"
     nuspec.requireLicenseAcceptance = "false"
     nuspec.dependency "MassTransit", NUGET_VERSION
-    nuspec.dependency "RabbitMQ.Client", "3.0.4"
+    nuspec.dependency "RabbitMQ.Client", "3.1.1"
     nuspec.output_file = 'nuspecs/MassTransit.RabbitMQ.nuspec'
 
 	add_files props[:stage], "#{File.join('Transports', 'RabbitMQ', 'MassTransit.Transports.RabbitMq.{dll,pdb,xml}')}", nuspec
@@ -567,18 +575,18 @@ task :all_nuspecs => [:mt_nuspec, :mtl4n_nuspec, :mtnlog_nuspec, :mtsm_nuspec, :
 
 desc "Builds the nuget package"
 task :nuget => [:versioning, 'build_artifacts', :all_nuspecs] do
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.Log4Net.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.NLog.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.StructureMap.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.Autofac.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.Ninject.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.Unity.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.CastleWindsor.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.NHibernate.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.RabbitMQ.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.TestFramework.nuspec -o build_artifacts"
-	sh "lib/nuget.exe pack -BasePath build_output nuspecs/MassTransit.Reactive.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.Log4Net.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.NLog.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.StructureMap.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.Autofac.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.Ninject.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.Unity.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.CastleWindsor.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.NHibernate.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.RabbitMQ.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.TestFramework.nuspec -o build_artifacts"
+	sh "src/.nuget/nuget.exe pack -BasePath build_output nuspecs/MassTransit.Reactive.nuspec -o build_artifacts"
 end
 
 def project_outputs(props)

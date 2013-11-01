@@ -16,6 +16,7 @@ namespace MassTransit
     using BusConfigurators;
     using EndpointConfigurators;
     using Magnum.Reflection;
+    using Newtonsoft.Json;
     using Serialization;
 
 
@@ -25,6 +26,22 @@ namespace MassTransit
             where T : EndpointFactoryConfigurator
         {
             configurator.SetDefaultSerializer<JsonMessageSerializer>();
+
+            return configurator;
+        }
+
+        public static T ConfigureJsonSerializer<T>(this T configurator,
+            Func<JsonSerializerSettings, JsonSerializerSettings> configure)
+        {
+            JsonMessageSerializer.SerializerSettings = configure(JsonMessageSerializer.SerializerSettings);
+
+            return configurator;
+        }
+
+        public static T ConfigureJsonDeserializer<T>(this T configurator,
+            Func<JsonSerializerSettings, JsonSerializerSettings> configure)
+        {
+            JsonMessageSerializer.DeserializerSettings = configure(JsonMessageSerializer.DeserializerSettings);
 
             return configurator;
         }
@@ -188,6 +205,45 @@ namespace MassTransit
             where T : EndpointFactoryConfigurator
         {
             return SetDefaultSerializer(configurator, () => serializer);
+        }
+
+        // -----------------------------------------------------------------------
+
+        public static ServiceBusConfigurator SetSupportedMessageSerializers<T>(
+            this ServiceBusConfigurator configurator)
+            where T : ISupportedMessageSerializers, new()
+        {
+            return SetSupportedMessageSerializers(configurator, () => new T());
+        }
+        
+        public static EndpointFactoryConfigurator SetSupportedMessageSerializers<T>(
+            this EndpointFactoryConfigurator configurator)
+            where T : ISupportedMessageSerializers, new()
+        {
+            return SetSupportedMessageSerializers(configurator, () => new T());
+        }
+
+        /// <summary>
+        /// Sets the default message serializer for endpoints
+        /// </summary>
+        /// <param name="configurator"></param>
+        /// <param name="supportedSerializer"></param>
+        /// <returns></returns>
+        public static T SetSupportedMessageSerializers<T>(this T configurator,
+            ISupportedMessageSerializers supportedSerializer)
+            where T : EndpointFactoryConfigurator
+        {
+            return SetSupportedMessageSerializers(configurator, () => supportedSerializer);
+        }
+
+        static T SetSupportedMessageSerializers<T>(this T configurator, Func<ISupportedMessageSerializers> supportedSerializers)
+           where T : EndpointFactoryConfigurator
+        {
+            var serializerConfigurator = new SetSupportedMessageSerializersEndpointFactoryConfigurator(supportedSerializers);
+
+            configurator.AddEndpointFactoryConfigurator(serializerConfigurator);
+
+            return configurator;
         }
     }
 }
