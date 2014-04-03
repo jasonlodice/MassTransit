@@ -51,6 +51,12 @@ namespace MassTransit.Tests.Serialization
 							new TestMessageDetail {Item = "A", Value = 27.5d},
 							new TestMessageDetail {Item = "B", Value = 13.5d},
 						},
+                    DateTimeProperty = new DateTime(2014,03,05,01,53,04,193),
+                    DateTimeStringProperty = "2014-03-05T01:53:04.193",
+                    Dictionary = new Dictionary<string, string>()
+                    {
+                        {"string-datetime-property","2014-03-05T01:53:04.193"}
+                    }
 				};
 
 			_envelope = new Envelope
@@ -145,6 +151,31 @@ namespace MassTransit.Tests.Serialization
 				message.Details.Count.ShouldEqual(2);
 			}
 		}
+
+        [Then]
+        public void Should_roundtrip_dates_as_string_or_datetime()
+        {
+            Envelope result;
+            using (var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(_body), false))
+            using (var reader = new StreamReader(memoryStream))
+            using (var jsonReader = new JsonTextReader(reader))
+            {
+                result = _deserializer.Deserialize<Envelope>(jsonReader);
+            }
+
+            using (var jsonReader = new JTokenReader(result.Message as JToken))
+            {
+                var message = (TestMessage)_serializer.Deserialize(jsonReader, typeof(TestMessage));
+
+                // DateTimes are properly serialized / deserialized
+                // however, string properties containing a date-string are somehow
+                // converted to a Datetime somewhere in deserialization
+                // fixed by adding DateParseHandling = DateParseHandling.None to serializer settings
+                message.DateTimeProperty.ShouldEqual(new DateTime(2014, 03, 05, 01, 53, 04, 193),"Round ripping DateTimeProperty failed");
+                message.DateTimeStringProperty.ShouldEqual("2014-03-05T01:53:04.193","Roundtripping DateTimeStringProperty failed");
+                message.Dictionary["string-datetime-property"].ShouldEqual("2014-03-05T01:53:04.193","Roundtripping datetimestring in dictionary failed");
+            }
+        }
 
 		[Then]
 		public void Should_be_able_to_ressurect_the_message_from_xml()
@@ -271,6 +302,9 @@ namespace MassTransit.Tests.Serialization
 			public IList<TestMessageDetail> Details { get; set; }
 			public int Level { get; set; }
 			public string Name { get; set; }
+            public DateTime DateTimeProperty { get; set; }
+            public string DateTimeStringProperty { get; set; }
+            public Dictionary<string,string> Dictionary { get; set; } 
 		}
 
 
@@ -320,4 +354,162 @@ namespace MassTransit.Tests.Serialization
 			throw new ArgumentException(string.Format("Unknown token type '{0}'", token.GetType()), "token");
 		}
 	}
+
+    [TestFixture]
+  public class Using_JsonConverterAttribute_on_a_class :
+    SerializationTest<JsonMessageSerializer>
+  {
+    public class ModifyWhenSerializingConverter : JsonConverter
+    {
+      public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+      {
+        writer.WriteStartObject();
+
+        writer.WritePropertyName("value");
+        writer.WriteValue("Monster");
+
+        writer.WriteEndObject();
+      }
+
+      public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+      {
+        reader.Read();
+        reader.Value.ShouldEqual("value");
+        reader.Read();
+        var value = (string)reader.Value;
+        return new MessageA { Value = value };
+      }
+
+      public override bool CanConvert(Type objectType)
+      {
+        return typeof(MessageA).IsAssignableFrom(objectType);
+      }
+    }
+
+    public class ModifyWhenDeserializingConverter : JsonConverter
+    {
+      public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+      {
+        var testMessage = (MessageB)value;
+        writer.WriteStartObject();
+
+        writer.WritePropertyName("value");
+        writer.WriteValue(testMessage.Value);
+
+        writer.WriteEndObject();
+      }
+
+      public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+      {
+        return new MessageB { Value = "Monster" };
+      }
+
+      public override bool CanConvert(Type objectType)
+      {
+        return typeof(MessageB).IsAssignableFrom(objectType);
+      }
+    }
+
+    [JsonConverter(typeof(ModifyWhenSerializingConverter))]
+    public class MessageA
+    {
+      public string Value { get; set; }
+    }
+
+    [JsonConverter(typeof(ModifyWhenDeserializingConverter))]
+    public class MessageB
+    {
+      public string Value { get; set; }
+    }
+
+    [Test]
+    public void Should_use_converter_for_serialization()
+    {
+      var obj = new MessageA { Value = "Joe" };
+
+      MessageA result = SerializeAndReturn(obj);
+
+      result.Value.ShouldEqual("Monster");
+    }
+
+    [Test]
+    public void Should_use_converter_for_deserialization()
+    {
+      var obj = new MessageB { Value = "Joe" };
+
+      MessageB result = SerializeAndReturn(obj);
+
+      result.Value.ShouldEqual("Monster");
+    }
+  }
+
+  [TestFixture]
+  public class Using_JsonConverterAttribute_on_a_property :
+    SerializationTest<JsonMessageSerializer>
+  {
+    public class ModifyWhenSerializingConverter : JsonConverter
+    {
+      public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+      {
+        writer.WriteValue("Monster");
+      }
+
+      public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+      {
+        return reader.Value;
+      }
+
+      public override bool CanConvert(Type objectType)
+      {
+        return typeof(string).IsAssignableFrom(objectType);
+      }
+    }
+
+    public class ModifyWhenDeserializingConverter : JsonConverter
+    {
+      public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+      {
+        writer.WriteValue((string)value);
+      }
+
+      public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+      {
+        return "Monster";
+      }
+
+      public override bool CanConvert(Type objectType)
+      {
+        return typeof(string).IsAssignableFrom(objectType);
+      }
+    }
+
+    public class SimpleMessage
+    {
+      [JsonConverter(typeof(ModifyWhenSerializingConverter))]
+      public string ValueA { get; set; }
+
+      [JsonConverter(typeof(ModifyWhenDeserializingConverter))]
+      public string ValueB { get; set; }
+    }
+
+    [Test]
+    public void Should_use_converter_for_serialization()
+    {
+      var obj = new SimpleMessage { ValueA = "Joe" };
+
+      SimpleMessage result = SerializeAndReturn(obj);
+
+      result.ValueA.ShouldEqual("Monster");
+    }
+
+    [Test]
+    public void Should_use_converter_for_deserialization()
+    {
+      var obj = new SimpleMessage { ValueB = "Joe" };
+
+      SimpleMessage result = SerializeAndReturn(obj);
+
+      result.ValueB.ShouldEqual("Monster");
+    }
+  }
 }

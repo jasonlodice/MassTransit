@@ -16,6 +16,7 @@ namespace MassTransit.Transports.RabbitMq
     using System.Collections;
     using System.Globalization;
     using System.IO;
+    using Exceptions;
     using Magnum;
     using RabbitMQ.Client;
     using RabbitMQ.Client.Exceptions;
@@ -52,7 +53,7 @@ namespace MassTransit.Transports.RabbitMq
                     {
                         IBasicProperties properties = _producer.CreateProperties();
 
-                        properties.SetPersistent(true);
+                        properties.SetPersistent(context.DeliveryMode == DeliveryMode.Persistent);
                         properties.MessageId = context.MessageId ?? properties.MessageId ?? NewId.Next().ToString();
                         if (context.ExpirationTime.HasValue)
                         {
@@ -67,14 +68,25 @@ namespace MassTransit.Transports.RabbitMq
                         using (var body = new MemoryStream())
                         {
                             context.SerializeTo(body);
-                            properties.Headers = context.Headers.ToDictionary(entry => entry.Key, entry => entry.Value);
+                            properties.Headers = context.Headers.ToDictionary(entry => entry.Key, entry => (object)entry.Value);
                             properties.Headers["Content-Type"]=context.ContentType;
 
+#if NET40
+                            var task = _producer.PublishAsync(_address.Name, properties, body.ToArray());
+                            task.Wait();
+#else
                             _producer.Publish(_address.Name, properties, body.ToArray());
+#endif
 
-                            _address.LogSent(context.MessageId ?? "", context.MessageType);
+                            _address.LogSent(context.MessageId ?? properties.MessageId ?? "", context.MessageType);
                         }
                     }
+#if NET40
+                    catch (AggregateException ex)
+                    {
+                        throw new TransportException(_address.Uri, "Publisher did not confirm message", ex.InnerException);
+                    }
+#endif
                     catch (AlreadyClosedException ex)
                     {
                         throw new InvalidConnectionException(_address.Uri, "Connection was already closed", ex);

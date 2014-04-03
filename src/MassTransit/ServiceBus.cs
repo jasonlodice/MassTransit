@@ -69,7 +69,7 @@ namespace MassTransit
         /// and operation.
         /// </summary>
         public ServiceBus(IEndpoint endpointToListenOn,
-            IEndpointCache endpointCache)
+            IEndpointCache endpointCache, bool enablePerformanceCounters)
         {
             ReceiveTimeout = TimeSpan.FromSeconds(3);
             Guard.AgainstNull(endpointToListenOn, "endpointToListenOn", "This parameter cannot be null");
@@ -87,7 +87,8 @@ namespace MassTransit
 
             ControlBus = this;
 
-            InitializePerformanceCounters();
+            if(enablePerformanceCounters)
+                InitializePerformanceCounters();
         }
 
         public int ConcurrentReceiveThreads
@@ -305,6 +306,8 @@ namespace MassTransit
             return InboundPipeline.Configure(configure);
         }
 
+
+        [Obsolete("This method is being removed in favor of just using another bus instance.", false)]
         public IServiceBus ControlBus { get; set; }
 
         public IEndpoint GetEndpoint(Uri address)

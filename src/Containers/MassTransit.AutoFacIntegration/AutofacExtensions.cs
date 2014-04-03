@@ -16,6 +16,7 @@ namespace MassTransit
     using System.Collections.Generic;
     using System.Linq;
     using Autofac;
+    using Autofac.Builder;
     using Autofac.Core;
     using AutofacIntegration;
     using Magnum.Extensions;
@@ -47,7 +48,7 @@ namespace MassTransit
             IList<Type> sagaTypes = FindTypes<ISaga>(scope, x => true);
             if (sagaTypes.Count > 0)
             {
-                var sagaConfigurator = new AutofacSagaRepositoryFactoryConfigurator(configurator, scope);
+                var sagaConfigurator = new AutofacSagaRepositoryFactoryConfigurator(configurator, scope, name);
 
                 foreach (Type type in sagaTypes)
                     sagaConfigurator.ConfigureSaga(type);
@@ -79,10 +80,14 @@ namespace MassTransit
         /// <param name="scope"></param>
         /// <returns></returns>
         public static SagaSubscriptionConfigurator<TSaga> Saga<TSaga>(
-            this SubscriptionBusServiceConfigurator configurator, ILifetimeScope scope)
+            this SubscriptionBusServiceConfigurator configurator, ILifetimeScope scope, string name = "message")
             where TSaga : class, ISaga
         {
-            return configurator.Saga(scope.Resolve<ISagaRepository<TSaga>>());
+            var sagaRepository = scope.Resolve<ISagaRepository<TSaga>>();
+
+            var autofacSagaRepository = new AutofacSagaRepository<TSaga>(sagaRepository, scope, name);
+
+            return configurator.Saga(autofacSagaRepository);
         }
 
         static IList<Type> FindTypes<T>(ILifetimeScope scope, Func<Type, bool> filter)
@@ -93,6 +98,36 @@ namespace MassTransit
                 .Select(rs => rs.s.ServiceType)
                         .Where(filter)
                         .ToList();
+        }
+
+        public const string MessageScopeTag = "message";
+
+        /// <summary>
+        /// Registers the AutofacConsumerFactory to support InstancePerMessageScope
+        /// </summary>
+        /// <param name="builder"></param>
+        public static void RegisterAutofacConsumerFactory(this ContainerBuilder builder)
+        {
+            // the ConsumerFactory uses message scope so that related components are all created within the same
+            // container lifetime
+            builder.RegisterGeneric(typeof(AutofacConsumerFactory<>))
+                   .WithParameter(new NamedParameter("name", MessageScopeTag))
+                   .As(typeof(IConsumerFactory<>));
+        }
+
+        /// <summary>
+        /// Gives you a new instance per message scope. Make sure to call RegisterAutofacConsumerFactory in your container setup.
+        /// </summary>
+        /// <typeparam name="TLimit"></typeparam>
+        /// <typeparam name="TActivatorData"></typeparam>
+        /// <typeparam name="TRegistrationStyle"></typeparam>
+        /// <param name="builder"></param>
+        /// <returns></returns>
+        public static IRegistrationBuilder<TLimit, TActivatorData, TRegistrationStyle> InstancePerMessageScope
+            <TLimit, TActivatorData, TRegistrationStyle>(
+            this IRegistrationBuilder<TLimit, TActivatorData, TRegistrationStyle> builder)
+        {
+            return builder.InstancePerMatchingLifetimeScope(MessageScopeTag);
         }
     }
 }
